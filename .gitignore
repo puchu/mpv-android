@@ -9,3 +9,5 @@ obj
 build
 local.properties
 *~
+app/src/main/assets/ytdl/python*
+app/src/main/assets/ytdl/lib-dynload/

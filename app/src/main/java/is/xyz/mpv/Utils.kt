@@ -34,29 +34,54 @@ import kotlin.math.roundToInt
 internal object Utils {
     fun copyAssets(context: Context) {
         val assetManager = context.assets
-        val files = arrayOf("subfont.ttf", "cacert.pem")
+        val files = arrayOf(
+            "subfont.ttf", "cacert.pem",
+            "ytdl/python3", "ytdl/python313.zip", "ytdl/lib-dynload/", "ytdl/setup.py", "ytdl/wrapper"
+        )
         val configDir = context.filesDir.path
-        for (filename in files) {
-            var ins: InputStream? = null
-            var out: OutputStream? = null
+        File("$configDir/ytdl").mkdir()
+
+        fun copyAsset(path: String) {
             try {
-                ins = assetManager.open(filename, AssetManager.ACCESS_STREAMING)
-                val outFile = File("$configDir/$filename")
-                // Note that .available() officially returns an *estimated* number of bytes available
-                // this is only true for generic streams, asset streams return the full file size
-                if (outFile.length() == ins.available().toLong()) {
-                    Log.v(TAG, "Skipping copy of asset file (exists same size): $filename")
-                    continue
+                val cleanPath = path.trimEnd('/')
+                val assetList = assetManager.list(cleanPath)
+                if (assetList != null && assetList.isNotEmpty()) {
+                    // It's a directory
+                    val dir = File("$configDir/$cleanPath")
+                    dir.mkdirs()
+                    for (child in assetList) {
+                        copyAsset("$cleanPath/$child")
+                    }
+                } else {
+                    // It's a file
+                    val ins = assetManager.open(cleanPath, AssetManager.ACCESS_STREAMING)
+                    val outFile = File("$configDir/$cleanPath")
+                    outFile.parentFile?.mkdirs()
+                    if (outFile.length() == ins.available().toLong()) {
+                        Log.v(TAG, "Skipping copy of asset file (exists same size): $cleanPath")
+                        ins.close()
+                        return
+                    }
+                    val out = FileOutputStream(outFile)
+                    ins.copyTo(out)
+                    ins.close()
+                    out.close()
+                    Log.w(TAG, "Copied asset file: $cleanPath")
                 }
-                out = FileOutputStream(outFile)
-                ins.copyTo(out)
-                Log.w(TAG, "Copied asset file: $filename")
             } catch (e: IOException) {
-                Log.e(TAG, "Failed to copy asset file: $filename", e)
-            } finally {
-                ins?.close()
-                out?.close()
+                Log.e(TAG, "Failed to copy asset: $path", e)
             }
+        }
+
+        for (filename in files) {
+            copyAsset(filename)
+        }
+
+        val execFiles = arrayOf("ytdl/python3", "ytdl/wrapper")
+        for (filename in execFiles) {
+            try {
+                File("$configDir/$filename").setExecutable(true)
+            } catch (e: IOException) {}
         }
     }
 
